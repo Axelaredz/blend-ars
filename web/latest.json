@@ -1,0 +1,22 @@
+{
+  "app": "Blend Ars",
+  "channel": "dev",
+  "version": "e855d4b.2026-09-22",
+  "git_sha": "e855d4b0cfa33b363b0642d839cdba2b96f4dc14",
+  "notes": "Танк: башня и ствол снова на месте в веб-версии (слияние мешей больше не теряет одиночные меши); splash веб-сборки — из assets/index.png",
+  "min_loader_version": "0.1.0",
+  "loader": {
+    "version": "e855d4b.2026-09-22",
+    "pck_url": "loader/loader_e855d4b.2026-09-22.pck",
+    "pck_sha256": "ff475d877ed38be806ea5e49b4584a98795b70ec1db2aefef55e5974baa35db0",
+    "pck_size": 1108812
+  },
+  "content": {
+    "asset": "game_content",
+    "version": "e855d4b.2026-09-22",
+    "name": "game_content_e855d4b.2026-09-22.pck",
+    "url": "packs/game_content_e855d4b.2026-09-22.pck",
+    "sha256": "d4cf733e4b17e2b48faac7d75fbce7ab541e112ac1c2ae4f54bef92e577edb8d",
+    "size": 320948
+  }
+}
