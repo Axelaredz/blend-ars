@@ -48,8 +48,18 @@ async function startEngine(menu: Menu): Promise<void> {
         const result = await initEngine(canvas);
         window.__blendarsEngine = { backend: result.backend };
 
-        menu.setStatus(`Рендер: ${result.backend.toUpperCase()}`);
+        // Тестовая сцена включается флагом: ?scene=smoke — нужна браузерному
+        // тесту, чтобы отличить «движок работает» от «канвас чёрный».
+        if (new URLSearchParams(location.search).get('scene') === 'smoke') {
+            const { buildSmokeScene } = await import('./core/smoke-scene');
+            buildSmokeScene(result.app);
+        }
+
         console.info('[blendars] engine ready', result.backend);
+
+        // Меню перекрывает канвас (position: fixed; inset: 0), поэтому после старта
+        // движка его нужно убрать — иначе поверх 3D всегда будет лежать DOM-оверлей.
+        menu.destroy();
     } catch (err) {
         started = false;
         console.error('[blendars] engine init failed', err);
