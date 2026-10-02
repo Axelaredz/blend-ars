@@ -1,0 +1,49 @@
+{
+    "$comment": "Конфиг perf-замеров. Источник правды по VRAM — app.stats + memory-budget, не браузер. Значения networkConditions — эмуляция Pixel 7 в медленной сети.",
+    "device": "Pixel 7",
+    "cpuThrottling": 4,
+    "networkConditions": {
+        "offline": false,
+        "downloadThroughputBps": 512000,
+        "uploadThroughputBps": 512000,
+        "latencyMs": 400
+    },
+    "launch": {
+        "args": [
+            "--disable-features=Vulkan,WebGPU",
+            "--use-angle=swiftshader"
+        ]
+    },
+    "budgets": {
+        "coreBrotliKb": 250,
+        "playcanvasBrotliKb": 900,
+        "vramLowMb": 64,
+        "vramHighMb": 128,
+        "drawCallsLow": 50,
+        "drawCallsHigh": 100,
+        "fpsP95": 55
+    },
+    "metrics": ["fps", "frameTimeP95", "drawCalls", "jsHeap", "domNodes"],
+    "scenarios": {
+        "menu-offline": {
+            "url": "/",
+            "waitFor": "window.__blendarsMenuReady === true",
+            "durationMs": 5000,
+            "assert": { "menuBootMs": 300 }
+        },
+        "hangar-60s": {
+            "url": "/?scene=hangar",
+            "click": "button.play",
+            "waitFor": "window.__blendarsEngine !== undefined",
+            "durationMs": 60000,
+            "assert": { "drawCalls": 50, "fpsP95": 55 }
+        },
+        "offline-restart": {
+            "url": "/",
+            "goOfflineAfterMs": 3000,
+            "reload": true,
+            "durationMs": 10000,
+            "assert": { "menuBootMs": 300 }
+        }
+    }
+}

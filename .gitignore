@@ -93,3 +93,21 @@ htmlcov/
 # ═══════════════════════════════════════════════════════════
 infrastructure/ssl/
 *.local.yml.override
+
+# ═══════════════════════════════════════════════════════════
+# Web (Vite / TypeScript) — planogram v2
+# ═══════════════════════════════════════════════════════════
+.vite/
+*.tsbuildinfo
+stats.html
+# Отчёты и perf-артефакты
+perf-results/
+trace-*.json
+# Собранные ассеты: GLB/KTX2 — только из сборки, в git не коммитим (см. planogram §0.4)
+*.glb
+*.ktx2
+*.basis
+# Декодеры в public/decoders — единственное исключение, они вендорены намеренно:
+# без них PlayCanvas не поднимет dracoInitialize/basisInitialize, а тянуть их
+# с CDN нельзя — воркеры требуют same-origin.
+!public/decoders/**
