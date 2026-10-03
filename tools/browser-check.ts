@@ -22,6 +22,16 @@ import puppeteer, { type Browser, type ConsoleMessage, type Page } from 'puppete
 const OUT_DIR = 'perf-results';
 const PREVIEW_PORT = 4173;
 
+/**
+ * Таймауты подобраны по факту замеров, а не «на всякий случай».
+ *
+ * Меню с 3D-фоном поднимается за ~250 мс локально; сцена с машиной тянет
+ * 10 МБ моделей и Ammo. Ставить 120с на сцену бессмысленно — если за 45с
+ * модель не пришла, это уже ошибка, а не медленный канал.
+ */
+const BOOT_TIMEOUT_MS = 12000;
+const SCENE_TIMEOUT_MS = 45000;
+
 /** Ждём, пока порт реально начнёт принимать соединения. */
 async function waitForPort(port: number, timeoutMs: number): Promise<void> {
     const deadline = Date.now() + timeoutMs;
@@ -167,17 +177,27 @@ async function main(): Promise<void> {
         if (useOwnServer) {
             server = await startPreview();
         }
-        browser = await puppeteer.launch({
-            headless: true,
-            args: [
-                '--no-sandbox',
-                // SwiftShader даёт программный WebGL2. WebGPU в headless-Chrome
-                // обычно недоступен — тест идёт по ветке fallback, что тоже полезно.
-                '--use-angle=swiftshader',
-                '--enable-unsafe-swiftshader',
-                '--disable-features=Vulkan,WebGPU'
-            ]
-        });
+        const useFirefox = argv.includes('--firefox');
+        browser = await puppeteer.launch(
+            useFirefox
+                ? {
+                      browser: 'firefox',
+                      executablePath: '/opt/firefox-developer-edition/firefox',
+                      headless: true,
+                      args: []
+                  }
+                : {
+                      headless: true,
+                      args: [
+                          '--no-sandbox',
+                          // SwiftShader даёт программный WebGL2. WebGPU в headless-Chrome
+                          // обычно недоступен — тест идёт по ветке fallback, что тоже полезно.
+                          '--use-angle=swiftshader',
+                          '--enable-unsafe-swiftshader',
+                          '--disable-features=Vulkan,WebGPU'
+                      ]
+                  }
+        );
 
         const page = await browser.newPage();
         await page.setViewport({ width: 900, height: 600, deviceScaleFactor: 1 });
@@ -195,7 +215,7 @@ async function main(): Promise<void> {
         // 0. Экран загрузки виден на старте. Снимок берём с искусственной
         // задержкой (bootDelay), иначе оверлей живёт ~250мс и не снимается.
         await page.goto(`${baseUrl}/?bootDelay=3000`, { waitUntil: 'domcontentloaded' });
-        await page.waitForSelector('.loading', { timeout: 15000 });
+        await page.waitForSelector('.loading', { timeout: BOOT_TIMEOUT_MS });
         const loaderVisible = await page.evaluate(() => {
             const el = document.querySelector('.loading');
             if (!el) return null;
@@ -215,12 +235,12 @@ async function main(): Promise<void> {
         // 1. Меню
         const t0 = Date.now();
         await page.goto(`${baseUrl}/`, { waitUntil: 'load' });
-        await page.waitForFunction('window.__blendarsMenuReady === true', { timeout: 15000 });
+        await page.waitForFunction('window.__blendarsMenuReady === true', { timeout: BOOT_TIMEOUT_MS });
         timings.menuReadyMs = Date.now() - t0;
         addCheck('меню отрисовано', true, `__blendarsMenuReady за ${timings.menuReadyMs}мс`);
 
         // 1b. Экран загрузки должен исчезнуть, а не остаться навсегда.
-        await page.waitForFunction('window.__blendarsInteractive === true', { timeout: 40000 });
+        await page.waitForFunction('window.__blendarsInteractive === true', { timeout: BOOT_TIMEOUT_MS });
         const loaderGone = await page.evaluate(() => document.querySelector('.loading') === null);
         addCheck('экран загрузки снят', loaderGone, loaderGone ? 'оверлей удалён из DOM' : 'оверлей остался');
 
@@ -238,7 +258,7 @@ async function main(): Promise<void> {
         //    Проверяем именно это: иначе «фон есть» не отличить от «фон есть
         //    только после нажатия».
         const tBg = Date.now();
-        await page.waitForFunction('window.__blendarsBackgroundReady === true', { timeout: 40000 });
+        await page.waitForFunction('window.__blendarsBackgroundReady === true', { timeout: BOOT_TIMEOUT_MS });
         timings.backgroundReadyMs = Date.now() - tBg;
         addCheck('3D-фон меню поднялся без клика', true, `__blendarsBackgroundReady за ${timings.backgroundReadyMs}мс`);
 
@@ -257,9 +277,9 @@ async function main(): Promise<void> {
         //    пустой канвас и «движок ничего не рисует» выглядят одинаково.
         const t1 = Date.now();
         await page.goto(`${baseUrl}/?scene=smoke`, { waitUntil: 'load' });
-        await page.waitForFunction('window.__blendarsMenuReady === true', { timeout: 15000 });
+        await page.waitForFunction('window.__blendarsMenuReady === true', { timeout: BOOT_TIMEOUT_MS });
         await page.click('button.play');
-        await page.waitForFunction('window.__blendarsEngine !== undefined', { timeout: 40000 });
+        await page.waitForFunction('window.__blendarsEngine !== undefined', { timeout: BOOT_TIMEOUT_MS });
         timings.engineReadyMs = Date.now() - t1;
         const backend = await page.evaluate(() => window.__blendarsEngine?.backend ?? 'unknown');
         addCheck('движок поднялся по клику', true, `backend=${backend}, ${timings.engineReadyMs}мс`);
@@ -288,7 +308,81 @@ async function main(): Promise<void> {
             `hash1=${frame1.hash} hash2=${frame2.hash}`
         );
 
-        console.log(`\nСкриншоты: ${OUT_DIR}/loading.png, ${OUT_DIR}/menu.png, ${OUT_DIR}/menu-3d.png, ${OUT_DIR}/engine.png`);
+        // 8. Сцена с машиной: физика Ammo + две модели (10 МБ). Это отдельная
+        //    тяжёлая проверка — если она падает, меню должно остаться рабочим.
+        if (argv.includes('--scene')) {
+            const tScene = Date.now();
+            await page.goto(`${baseUrl}/`, { waitUntil: 'load' });
+            await page.waitForFunction('window.__blendarsInteractive === true', { timeout: BOOT_TIMEOUT_MS });
+            // Кнопка «Сцена» — вторая в .actions; селектор по позиции хрупкий,
+            // поэтому ищем по тексту. pointerdown, а не click: обработчик меню
+            // слушает именно pointerdown.
+            const clicked = await page.evaluate(() => {
+                const btn = Array.from(document.querySelectorAll('button.play'))
+                    .find(b => b.textContent === 'Сцена');
+                if (!btn) return false;
+                btn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+                return true;
+            });
+            addCheck('кнопка «Сцена» найдена', clicked, clicked ? 'нажата' : 'не найдена');
+
+            let sceneOk = true;
+            try {
+                await page.waitForFunction('window.__blendarsSceneReady === true', { timeout: SCENE_TIMEOUT_MS });
+            } catch {
+                sceneOk = false;
+            }
+            timings.sceneReadyMs = Date.now() - tScene;
+            addCheck(
+                'сцена с машиной загрузилась',
+                sceneOk,
+                sceneOk ? `__blendarsSceneReady за ${(timings.sceneReadyMs / 1000).toFixed(1)}с` : 'таймаут 120с'
+            );
+
+            if (sceneOk) {
+                // Дать физике прогнать несколько шагов и машине осесть: сцена
+                // «готова» на момент загрузки, а грунт и колёса оседают позже.
+                await new Promise(r => setTimeout(r, 2500));
+                const sceneShot = await page.screenshot();
+                writeFileSync(join(OUT_DIR, 'vehicle.png'), sceneShot);
+                const sceneFrame = await analyseScreenshot(page, sceneShot);
+                addCheck(
+                    'кадр сцены не пустой',
+                    sceneFrame.nonBlackRatio > 0.05,
+                    `пикселей не фона: ${(sceneFrame.nonBlackRatio * 100).toFixed(2)}%`
+                );
+
+                // Машина не должна падать сквозь пол: семплируем высоту кузова.
+                // Осевший грузовик стоит около y≈1; провалившийся уходит в минус
+                // и продолжает падать — последние замеры монотонно уменьшаются.
+                const heights: number[] = [];
+                for (let i = 0; i < 4; i++) {
+                    const y = await page.evaluate(() => {
+                        const truck = (window as unknown as { __blendarsTruck?: { getPosition(): { y: number } } })
+                            .__blendarsTruck;
+                        return truck ? truck.getPosition().y : NaN;
+                    });
+                    heights.push(y);
+                    await new Promise(r => setTimeout(r, 800));
+                }
+                const last = heights[heights.length - 1]!;
+                const tail = heights.slice(-3);
+                const settled = Math.max(...tail) - Math.min(...tail) < 1.0;
+                addCheck(
+                    'машина стоит на грунте, а не падает',
+                    Number.isFinite(last) && last > -1 && settled,
+                    `y кузова: ${heights.map(h => (Number.isFinite(h) ? h.toFixed(2) : 'NaN')).join(' → ')}`
+                );
+                const sceneErrors = consoleErrors.length;
+                addCheck(
+                    'сцена без ошибок в консоли',
+                    sceneErrors === 0,
+                    consoleErrors.slice(-3).join(' | ') || 'чисто'
+                );
+            }
+        }
+
+        console.log(`\nСкриншоты: ${OUT_DIR}/loading.png, ${OUT_DIR}/menu.png, ${OUT_DIR}/menu-3d.png, ${OUT_DIR}/engine.png${argv.includes('--scene') ? `, ${OUT_DIR}/vehicle.png` : ''}`);
 
         // 7. Ошибок в консоли быть не должно
         addCheck('консоль без ошибок', consoleErrors.length === 0, consoleErrors.join(' | ') || 'чисто');

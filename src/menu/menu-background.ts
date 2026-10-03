@@ -1,20 +1,24 @@
 /**
- * Задний план главного экрана: неоновый ангар.
+ * Задний план главного экрана: неоновый ангар с Maserati GT3 в центре.
  *
- * Сцена полностью процедурная — ни одного внешнего ассета, ни одного байта в
- * бандле и в бюджете. Всё строится из примитивов движка и одной текстуры,
- * нарисованной на 2D-канвасе в рантайме (пол в виде сетки).
+ * Ангар процедурный (пол-сетка, столбы, свет — ноль байт в бандле), машина —
+ * внешний GLB `public/models/maserati-gt3.glb` (39.7 МБ, самодостаточный:
+ * текстуры и буфер внутри). Поэтому сборка фона асинхронная: вызывается из
+ * boot и ждёт загрузки модели до снятия экрана загрузки.
  *
  * Почему не «красивая сцена с playcanv.as»: тот демо-стор — это BMW i8,
  * торговая марка и дизайн под защитой BMW, в публичный репозиторий это класть
  * нельзя, а iframe весит 15.8 МБ и не работает оффлайн.
  *
  * Ограничения, которые здесь сознательно соблюдаются:
- *  - drawCalls ≤ ~12, света без теней (фон, а не сцена боя);
+ *  - света без теней (фон, а не сцена боя);
  *  - update без единой аллокации — иначе линтер zero-gc упадёт;
+ *  - машина НЕ вращается: стоит как экспонат, движется только камера;
  *  - фон не должен блокировать меню: клики перехватывает DOM поверх канваса.
  */
 import * as pc from 'playcanvas';
+
+import { loadContainer } from '../core/load-container';
 
 /** Скорость медленного облёта камеры, градусов в секунду. */
 const ORBIT_SPEED = 3.2;
@@ -34,7 +38,13 @@ export interface MenuBackground {
     destroy(): void;
 }
 
-export function buildMenuBackground(app: pc.AppBase): MenuBackground {
+/** URL модели-экспоната. Лежит в public, в бандле — ноль байт. */
+const MASERATI_URL = '/models/maserati-gt3.glb';
+
+export async function buildMenuBackground(
+    app: pc.AppBase,
+    onProgress?: (label: string) => void
+): Promise<MenuBackground> {
     const device = app.graphicsDevice;
     const root = new pc.Entity('menu-background');
     // app.root, а не app.scene.root: см. комментарий в engine-bootstrap
@@ -110,30 +120,30 @@ export function buildMenuBackground(app: pc.AppBase): MenuBackground {
         }
     }
 
-    // Центральный объект: медленно вращается, даёт фокус композиции.
-    const monolith = new pc.Entity('monolith');
-    const monolithMaterial = new pc.StandardMaterial();
-    monolithMaterial.diffuse = new pc.Color(0.09, 0.08, 0.16);
-    monolithMaterial.emissive = new pc.Color(0.36, 0.62, 1.0);
-    monolithMaterial.emissiveIntensity = 2.4;
-    monolithMaterial.gloss = 0.9;
-    monolithMaterial.metalness = 0.6;
-    monolithMaterial.update();
-    monolith.addComponent('render', {
-        type: 'box',
-        material: monolithMaterial,
-        castShadows: false,
-        receiveShadows: false
-    });
-    monolith.setLocalScale(1.1, 2.6, 1.1);
-    monolith.setPosition(0, 1.3, 0);
-    root.addChild(monolith);
+    // Центральный экспонат: Maserati GT3. Стоит неподвижно — вращается только
+    // камера облёта. Габариты по инспекции: 2.18 × 1.30 × 4.84 м, низ на
+    // y≈0, центр по x/z в нуле — ставится как есть, без масштаба.
+    //
+    // Машина — опциональна: *.glb в гитигноре, и без файла меню обязано жить
+    // на одном процедурном ангаре, а не падать целиком.
+    onProgress?.('автомобиль');
+    try {
+        const carAsset = await loadContainer(app, MASERATI_URL);
+        const car = (carAsset.resource as pc.ContainerResource)
+            .instantiateRenderEntity({ name: 'maserati' }) as pc.Entity;
+        car.setPosition(0, 0, 0);
+        root.addChild(car);
+    } catch (err) {
+        console.warn('[menu-background] без экспоната: модель не загрузилась', err);
+    }
 
     const keyLight = new pc.Entity('key-light');
     keyLight.addComponent('light', {
         type: 'directional',
         color: new pc.Color(0.7, 0.8, 1.0),
-        intensity: 1.1,
+        // Ярче, чем было при монолите: машина не светится сама (не emissive),
+        // её краску должен вытащить ключевой свет.
+        intensity: 1.8,
         castShadows: false
     });
     keyLight.setEulerAngles(48, 28, 0);
@@ -151,6 +161,7 @@ export function buildMenuBackground(app: pc.AppBase): MenuBackground {
 
     // Горячий цикл. Ни одной аллокации: позиции пишутся через setPosition,
     // углы считаются арифметически. t — единственная плавающая переменная.
+    // Машина статична: экспонат не крутится, облёт даёт камера.
     let angle = 205;
     let t = 0;
     const onUpdate = (dt: number): void => {
@@ -161,8 +172,7 @@ export function buildMenuBackground(app: pc.AppBase): MenuBackground {
             ORBIT_HEIGHT + Math.sin(t * 0.6) * 0.5,
             Math.sin(angle * Math.PI / 180) * ORBIT_RADIUS
         );
-        camera.lookAt(0, 1.6, 0);
-        monolith.setEulerAngles(0, t * 18, 0);
+        camera.lookAt(0, 0.9, 0);
     };
     app.on('update', onUpdate);
 
