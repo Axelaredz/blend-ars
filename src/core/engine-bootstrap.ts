@@ -29,9 +29,17 @@ export interface EngineOptions {
     maxPixelRatio?: number;
     /** Антиалиасинг включать только если есть запас по бюджету VRAM. */
     antialias?: boolean;
+    /**
+     * Колбэк прогресса загрузки. ratio отсутствует, если точный прогресс
+     * неизвестен — экран загрузки тогда показывает indeterminate-режим.
+     */
+    onStage?: (label: string, ratio?: number) => void;
 }
 
 export async function initEngine(canvas: HTMLCanvasElement, opts: EngineOptions = {}): Promise<Engine> {
+    const onStage = opts.onStage;
+
+    onStage?.('графическое устройство');
     // deviceTypes — порядок предпочтения: WebGPU primary, WebGL2 — fallback.
     // Если WebGPU недоступен, createGraphicsDevice сам вернёт WebGL2-устройство.
     const device = await pc.createGraphicsDevice(canvas, {
@@ -78,7 +86,12 @@ export async function initEngine(canvas: HTMLCanvasElement, opts: EngineOptions 
 
     watchResize(app);
     watchContextLoss(app, device, canvas);
+
+    // Декодеры: 438 КБ brotli лениво, но до первого GLB они обязаны быть готовы,
+    // иначе первая загрузка модели упадёт уже во время сцены.
+    onStage?.('декодеры ассетов');
     await initDecoders();
+    onStage?.('движок готов', 1);
 
     return { app, device, backend };
 }

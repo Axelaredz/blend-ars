@@ -192,12 +192,37 @@ async function main(): Promise<void> {
             if (res.status() >= 400) consoleErrors.push(`HTTP ${res.status()}: ${res.url()}`);
         });
 
+        // 0. Экран загрузки виден на старте. Снимок берём с искусственной
+        // задержкой (bootDelay), иначе оверлей живёт ~250мс и не снимается.
+        await page.goto(`${baseUrl}/?bootDelay=3000`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.loading', { timeout: 15000 });
+        const loaderVisible = await page.evaluate(() => {
+            const el = document.querySelector('.loading');
+            if (!el) return null;
+            const stage = document.querySelector('.loading__stage')?.textContent ?? '';
+            const bytes = document.querySelector('.loading__bytes')?.textContent ?? '';
+            const fillEl = document.querySelector('.loading__fill');
+            const width = fillEl instanceof HTMLElement ? fillEl.style.width : '';
+            return { stage, bytes, width };
+        });
+        addCheck(
+            'экран загрузки показан на старте',
+            loaderVisible !== null,
+            loaderVisible ? `этап «${loaderVisible.stage}», байты «${loaderVisible.bytes}»` : 'не найден'
+        );
+        writeFileSync(join(OUT_DIR, 'loading.png'), await page.screenshot());
+
         // 1. Меню
         const t0 = Date.now();
         await page.goto(`${baseUrl}/`, { waitUntil: 'load' });
         await page.waitForFunction('window.__blendarsMenuReady === true', { timeout: 15000 });
         timings.menuReadyMs = Date.now() - t0;
         addCheck('меню отрисовано', true, `__blendarsMenuReady за ${timings.menuReadyMs}мс`);
+
+        // 1b. Экран загрузки должен исчезнуть, а не остаться навсегда.
+        await page.waitForFunction('window.__blendarsInteractive === true', { timeout: 40000 });
+        const loaderGone = await page.evaluate(() => document.querySelector('.loading') === null);
+        addCheck('экран загрузки снят', loaderGone, loaderGone ? 'оверлей удалён из DOM' : 'оверлей остался');
 
         // Меню должно быть быстрее 300мс — критерий планаграма
         addCheck(
@@ -209,7 +234,26 @@ async function main(): Promise<void> {
         await page.screenshot({ path: join(OUT_DIR, 'menu.png') });
         addCheck('меню без движка в entry', true, 'скриншот menu.png до клика');
 
-        // 2. Движок по клику. Сцена smoke нужна, чтобы на кадре было что видеть:
+        // 2. 3D-фон меню должен появиться БЕЗ клика — движок грузится в idle.
+        //    Проверяем именно это: иначе «фон есть» не отличить от «фон есть
+        //    только после нажатия».
+        const tBg = Date.now();
+        await page.waitForFunction('window.__blendarsBackgroundReady === true', { timeout: 40000 });
+        timings.backgroundReadyMs = Date.now() - tBg;
+        addCheck('3D-фон меню поднялся без клика', true, `__blendarsBackgroundReady за ${timings.backgroundReadyMs}мс`);
+
+        // Дать фону отрисоваться: компиляция шейдеров на первой сцене медленная.
+        await new Promise(r => setTimeout(r, 2000));
+        const bgShot = await page.screenshot();
+        writeFileSync(join(OUT_DIR, 'menu-3d.png'), bgShot);
+        const bgFrame = await analyseScreenshot(page, bgShot);
+        addCheck(
+            'фон меню рисует кадр',
+            bgFrame.nonBlackRatio > 0.02,
+            `пикселей не фона: ${(bgFrame.nonBlackRatio * 100).toFixed(2)}%`
+        );
+
+        // 3. Движок по клику. Сцена smoke нужна, чтобы на кадре было что видеть:
         //    пустой канвас и «движок ничего не рисует» выглядят одинаково.
         const t1 = Date.now();
         await page.goto(`${baseUrl}/?scene=smoke`, { waitUntil: 'load' });
@@ -220,7 +264,7 @@ async function main(): Promise<void> {
         const backend = await page.evaluate(() => window.__blendarsEngine?.backend ?? 'unknown');
         addCheck('движок поднялся по клику', true, `backend=${backend}, ${timings.engineReadyMs}мс`);
 
-        // 3. Кадр не чёрный
+        // 4. Кадр не чёрный
         await page.waitForSelector('canvas', { timeout: 10000 });
         // Даём кадру отрисоваться: первый рендер после компиляции шейдеров медленный
         await new Promise(r => setTimeout(r, 2500));
@@ -234,7 +278,7 @@ async function main(): Promise<void> {
             `пикселей не фона: ${(frame1.nonBlackRatio * 100).toFixed(2)}%`
         );
 
-        // 4. Кадры идут
+        // 5. Кадры идут
         await new Promise(r => setTimeout(r, 700));
         const frame2 = await analyseScreenshot(page, await page.screenshot());
         const framesDiffer = frame1.hash !== frame2.hash;
@@ -244,9 +288,9 @@ async function main(): Promise<void> {
             `hash1=${frame1.hash} hash2=${frame2.hash}`
         );
 
-        console.log(`\nСкриншоты: ${OUT_DIR}/menu.png, ${OUT_DIR}/engine.png`);
+        console.log(`\nСкриншоты: ${OUT_DIR}/loading.png, ${OUT_DIR}/menu.png, ${OUT_DIR}/menu-3d.png, ${OUT_DIR}/engine.png`);
 
-        // 6. Ошибок в консоли быть не должно
+        // 7. Ошибок в консоли быть не должно
         addCheck('консоль без ошибок', consoleErrors.length === 0, consoleErrors.join(' | ') || 'чисто');
 
         const report: Report = {
@@ -263,6 +307,7 @@ async function main(): Promise<void> {
         console.log(`\n=== browser-check ===`);
         console.log(`backend: ${backend}`);
         console.log(`меню:    ${timings.menuReadyMs}мс`);
+        console.log(`фон:     ${timings.backgroundReadyMs ?? 0}мс`);
         console.log(`движок:  ${timings.engineReadyMs}мс`);
         for (const c of checks) {
             console.log(`${c.ok ? 'OK  ' : 'FAIL'} ${c.name}: ${c.detail}`);

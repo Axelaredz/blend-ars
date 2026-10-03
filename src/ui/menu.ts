@@ -14,15 +14,19 @@ export interface MenuHandlers {
 }
 
 const CSS = `
+/* Меню — прозрачный оверлей ПОВЕРХ 3D-фона: свой фон у него больше нет,
+   иначе канвас под ним не видно. Читаемость держит градиент + текст-тень. */
 :host, .menu {
     position: fixed;
     inset: 0;
+    z-index: 10;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 24px;
-    background: radial-gradient(circle at 50% 30%, #1b1030 0%, #07060d 70%);
+    background:
+        radial-gradient(ellipse at 50% 45%, #0d0a1ccc 0%, #05040ad9 55%, #05040af2 100%);
     color: #e8e4ff;
     font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
     /* 300ms задержки на тапе не будет: manipulation убирает double-tap-zoom,
