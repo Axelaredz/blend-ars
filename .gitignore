@@ -19,7 +19,6 @@ __pycache__/
 *.so
 *.dll
 *.dylib
-dist/
 target/
 *.exe
 
@@ -107,7 +106,17 @@ trace-*.json
 *.glb
 *.ktx2
 *.basis
-# Декодеры в public/decoders — единственное исключение, они вендорены намеренно:
-# без них PlayCanvas не поднимет dracoInitialize/basisInitialize, а тянуть их
-# с CDN нельзя — воркеры требуют same-origin.
-!public/decoders/**
+# Декодеры Draco/Basis удалены: хостинг отдаёт `worker-src 'none'`, воркеры
+# декодеров не поднимаются, а ассеты развёрнуты в plain+WebP. Возвращать
+# вместе с правкой CSP хостинга (и см. README, раздел «Хостинг»).
+#
+# Собранный сайт в dist/ коммитим целиком (github site.root = /dist),
+# включая GLB — иначе модели/сцены отдадут 404 и браузер заблокирует модули.
+!dist/**
+
+# Локальный конвейер развёртки GLB (draco→plain, KTX2→WebP) с его node_modules:
+# одноразовый инструмент, результат лежит в public/scenes и public/models.
+.tmp-glbconv/
+
+# сессионные планы агента
+*_TODO.md
