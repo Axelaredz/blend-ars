@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover, чтобы env(safe-area-inset-*) давал реальные отступы на чёлке -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d2021">
+<meta name="description" content="Blendars — 3D MMO-кооператив">
+<!-- ВНИМАНИЕ: иконки в /public/icons — это логотип Godot, взятый как ЗАГЛУШКА.
+     Логотип Godot — чужая торговая марка, его нельзя выпускать как иконку игры.
+     Заменить на свою до релиза. -->
+<link rel="icon" href="/blend-ars-game/icons/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/blend-ars-game/icons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/blend-ars-game/icons/favicon-16x16.png">
+<link rel="apple-touch-icon" href="/blend-ars-game/icons/apple-touch-icon.png">
+<link rel="manifest" href="/blend-ars-game/icons/site.webmanifest">
+<title>Blendars</title>
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1d2021;
+        /* Меню — DOM, поэтому any-touch запрещён только на самом канвасе ниже */
+        overscroll-behavior: none;
+    }
+    .game-canvas {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        /* Фон меню рисуется под меню, но над body-фоном */
+        z-index: 0;
+        /* Иначе на мобильных тап по канвасу даёт зум и скролл */
+        touch-action: none;
+    }
+</style>
+  <script type="module" crossorigin src="/blend-ars-game/assets/index.CLO2C-OZ.js"></script>
+  
+</head>
+<body>
+<div id="app"></div>
+<noscript>Для игры нужен JavaScript.</noscript>
+</body>
+</html>
