@@ -1,4 +1,4 @@
-import{l as v,a as y,d as k,b as w,s as E}from"./index.BgBuMrWZ.js";import"./playcanvas.zR-V_TaA.js";const N=`
+import{l as v,a as y,d as k,b as w,s as E}from"./index.Damz5IAw.js";import"./playcanvas.zR-V_TaA.js";const N=`
 .boot-preset {
     position: fixed;
     inset: 0;
