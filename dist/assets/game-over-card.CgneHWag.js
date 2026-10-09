@@ -1,4 +1,4 @@
-import{v as w}from"./index.DxbShEp6.js";import"./playcanvas.BiKF8DQR.js";const h=5e3,y=250,E=`
+import{v as w}from"./index.BZsOeivk.js";import"./playcanvas.BiKF8DQR.js";const h=5e3,y=250,E=`
 .gameover {
     position: fixed;
     inset: 0;
