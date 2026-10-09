@@ -1,4 +1,4 @@
-import{v as N,w as T,x as _,y as I,z as P,A as z,B as A,C as B,E as L,F as D}from"./index.C6kF8PfH.js";import"./playcanvas.BiKF8DQR.js";const H=`
+import{v as N,w as T,x as _,y as I,z as P,A as z,B as A,C as B,E as L,F as D}from"./index.pAOgmpPK.js";import"./playcanvas.BiKF8DQR.js";const H=`
 .touch-controls {
     position: fixed;
     inset: 0;
@@ -12,7 +12,11 @@ import{v as N,w as T,x as _,y as I,z as P,A as z,B as A,C as B,E as L,F as D}fro
     pointer-events: auto;
     appearance: none;
     border: 1px solid #ebdbb255;
-    background: #141126b8;
+    /* Плотный фон вместо полупрозрачного: кнопки лежат поверх живого кадра, и
+       альфа на каждой из них — это блендинг с обновляющимся кадром каждый
+       кадр. Прозрачность остаётся доступной пользователю (ползунок на вкладке
+       «Управление», --touch-opacity), но по умолчанию интерфейс плотный. */
+    background: #1b1830f0;
     color: #e8e4ff;
     border-radius: max(0.375rem, 0.35em);
     cursor: pointer;
