@@ -1,4 +1,4 @@
-import{G as u,H as N}from"./index.pAOgmpPK.js";import"./playcanvas.BiKF8DQR.js";const E=10,C=`
+import{H as u,I as N}from"./index.DxbShEp6.js";import"./playcanvas.BiKF8DQR.js";const E=10,C=`
 .finish {
     position: fixed;
     inset: 0;
