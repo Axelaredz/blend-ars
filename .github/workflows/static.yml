@@ -34,7 +34,11 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        # v3 под нынешним раннером (экшены принудительно на Node 24) рапортует
+        # успех, но артефакт `github-pages` не создаёт — deploy-pages падает с
+        # «No artifacts named "github-pages" were found». Проверено 2026-10-09:
+        # прогон 37941980030 упал именно на этом, предыдущий пуш — проходил.
+        uses: actions/upload-pages-artifact@v5
         with:
           # Upload built site from dist/
           path: 'dist'
