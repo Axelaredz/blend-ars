@@ -1,4 +1,4 @@
-import{w as N,x as T,y as _,z as I,A as P,B as z,C as A,E as B,F as L,G as D}from"./index.Bu7kagYn.js";import"./playcanvas.BiKF8DQR.js";const H=`
+import{w as N,x as T,y as _,z as I,A as P,B as z,C as A,E as B,F as L,G as D}from"./index.CEHTTqeM.js";import"./playcanvas.BiKF8DQR.js";const H=`
 .touch-controls {
     position: fixed;
     inset: 0;
