@@ -1,4 +1,4 @@
-import{N as u,O as N}from"./index.JD2ffiGH.js";import"./playcanvas.CtNZ7HIm.js";const E=10,C=`
+import{N as u,O as N}from"./index.CbIhOn31.js";import"./playcanvas.CtNZ7HIm.js";const E=10,C=`
 .finish {
     position: fixed;
     inset: 0;
