@@ -23,7 +23,7 @@
  * автоматически вытесняет старый кеш.
  */
 const MANIFEST_PATH = 'asset-manifest.json';
-const FALLBACK_VERSION = 'shell-dev';
+const FALLBACK_VERSION = 'shell-dev-2';
 /** Расширения, которые имеет смысл кешировать для оффлайн-старта. */
 const CACHEABLE = /\.(js|mjs|css|wasm|json|webp|png|svg|ico|webmanifest)$/;
 
